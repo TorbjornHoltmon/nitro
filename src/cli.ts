@@ -28,6 +28,7 @@ async function main () {
   if (command === 'build') {
     const nitro = await createNitro({
       rootDir,
+      preset: 'cloudflare',
       dev: false
     })
     await prepare(nitro)

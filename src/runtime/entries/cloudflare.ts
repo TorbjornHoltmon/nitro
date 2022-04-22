@@ -5,31 +5,36 @@ import { requestHasBody, useRequestBody } from '../utils'
 import { nitroApp } from '../app'
 import { useRuntimeConfig } from '#internal/nitro'
 
-addEventListener('fetch', (event: any) => {
-  event.respondWith(handleEvent(event))
-})
-
-async function handleEvent (event) {
+async function handleEvent (request, env, ctx) {
   try {
-    return await getAssetFromKV(event, { cacheControl: assetsCacheControl, mapRequestToAsset: baseURLModifier })
+    return await getAssetFromKV({
+      request,
+      waitUntil (promise) {
+        return ctx.waitUntil(promise)
+      }
+    },
+    {
+      cacheControl: assetsCacheControl,
+      mapRequestToAsset: baseURLModifier
+    })
+    // return await getAssetFromKV(event, { cacheControl: assetsCacheControl, mapRequestToAsset: baseURLModifier })
   } catch (_err) {
     // Ignore
   }
-
-  const url = new URL(event.request.url)
+  const url = new URL(request.url)
   let body
-  if (requestHasBody(event.request)) {
-    body = await useRequestBody(event.request)
+  if (requestHasBody(request)) {
+    body = await useRequestBody(request)
   }
 
   const r = await nitroApp.localCall({
-    event,
+    event: request,
     url: url.pathname + url.search,
     host: url.hostname,
     protocol: url.protocol,
-    headers: event.request.headers,
-    method: event.request.method,
-    redirect: event.request.redirect,
+    headers: request.headers,
+    method: request.method,
+    redirect: request.redirect,
     body
   })
 
@@ -55,4 +60,14 @@ function assetsCacheControl (_request) {
 const baseURLModifier = (request: Request) => {
   const url = withoutBase(request.url, useRuntimeConfig().app.baseURL)
   return mapRequestToAsset(new Request(url, request))
+}
+
+export default {
+  fetch (
+    request: Request,
+    env: any,
+    ctx: any
+  ) {
+    return handleEvent(request, env, ctx)
+  }
 }
